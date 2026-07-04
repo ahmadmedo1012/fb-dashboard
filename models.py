@@ -48,3 +48,13 @@ class BotState(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     key = Column(String(100), nullable=False, unique=True)
     value = Column(Text, default="")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(100), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(String(20), default="viewer")  # admin, editor, viewer
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)

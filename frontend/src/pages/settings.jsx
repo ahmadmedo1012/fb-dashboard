@@ -1,117 +1,222 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { motion } from "framer-motion"
 import { fetchBotStatus, restartBot, fetchLogs } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
-import { RefreshCw, Activity, Server, Terminal } from "lucide-react"
+import { RefreshCw, Terminal, Inbox, AlertTriangle, Plug, Clock, Bot } from "lucide-react"
 import { format } from "date-fns"
-import { arSA } from "date-fns/locale"
 
-export function Settings() {
+const containerVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.07 } },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
+}
+
+const levelBadgeClass = {
+  INFO: "border-transparent bg-primary/15 text-primary",
+  WARNING: "border-transparent bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+  ERROR: "border-transparent bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+}
+
+function EmptyState({ message, icon: Icon }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
+      {Icon ? <Icon className="h-12 w-12 text-muted-foreground/40" /> : <Inbox className="h-12 w-12 text-muted-foreground/40" />}
+      <p className="text-muted-foreground">{message || "No logs yet"}</p>
+    </div>
+  )
+}
+
+function ErrorState({ error, onRetry }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
+      <div className="p-3 rounded-full bg-destructive/10">
+        <AlertTriangle className="h-6 w-6 text-destructive" />
+      </div>
+      <p className="text-sm text-muted-foreground">{error?.message || "Failed to load"}</p>
+      <Button variant="outline" size="sm" onClick={onRetry}>
+        <RefreshCw className="mr-1 h-3 w-3" />
+        Retry
+      </Button>
+    </div>
+  )
+}
+
+export function Settings({ role }) {
   const queryClient = useQueryClient()
-  const { data: status, isLoading: statusLoading } = useQuery({ queryKey: ["bot-status"], queryFn: fetchBotStatus, refetchInterval: 10000 })
-  const { data: logs = [], isLoading: logsLoading } = useQuery({ queryKey: ["logs"], queryFn: () => fetchLogs(30) })
+
+  const { data: status, isLoading: statusLoading, isError: statusError, refetch: refetchStatus } = useQuery({
+    queryKey: ["bot-status"],
+    queryFn: fetchBotStatus,
+    refetchInterval: 10000,
+  })
+
+  const { data: logs = [], isLoading: logsLoading, isError: logsError, refetch: refetchLogs } = useQuery({
+    queryKey: ["logs"],
+    queryFn: () => fetchLogs(30),
+  })
 
   const restartMut = useMutation({
     mutationFn: restartBot,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["bot-status"] }); toast.success("تم إعادة تشغيل البوت") },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bot-status"] })
+      toast.success("Bot restarted successfully")
+    },
     onError: (e) => toast.error(e.message),
   })
 
-  const levelColors = {
-    INFO: "default",
-    ERROR: "destructive",
-    WARNING: "secondary",
-  }
-
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">الإعدادات</h1>
-        <p className="text-muted-foreground mt-1">إعدادات البوت والمتابعة</p>
+    <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
+      <motion.div variants={itemVariants}>
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">الإعدادات</h1>
+        <p className="text-sm text-slate-500 mt-1">إعدادات البوت والمتابعة</p>
+      </motion.div>
+
+      <div className="grid gap-5 md:grid-cols-2">
+        {/* Bot Status */}
+        <motion.div variants={itemVariants}>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-primary/10">
+                  <Bot className="h-5 w-5 text-primary" />
+                </div>
+                <CardTitle className="text-lg">حالة البوت</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {statusLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-8 w-40 rounded-lg" />
+                  <Skeleton className="h-9 w-32 rounded-lg" />
+                </div>
+              ) : statusError ? (
+                <ErrorState onRetry={() => refetchStatus()} />
+              ) : (
+                <>
+                  <div className="flex items-center gap-3">
+                    <Badge variant={status?.running ? "default" : "destructive"} className="text-sm px-3 py-1 rounded-full">
+                      <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${status?.running ? "bg-white" : "bg-white/60"}`} />
+                      {status?.running ? "شغال" : "متوقف"}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" />
+                      الفحص كل: {status?.interval ?? 10} ثانية
+                    </span>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    onClick={() => restartMut.mutate()}
+                    disabled={restartMut.isPending || role !== "admin"}
+                    className={role !== "admin" ? "opacity-50 cursor-not-allowed" : ""}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-1.5 ${restartMut.isPending ? "animate-spin" : ""}`} />
+                    {restartMut.isPending ? "جاري..." : "إعادة تشغيل البوت"}
+                  </Button>
+                  {role !== "admin" && <p className="text-xs text-muted-foreground">متاح للمدير فقط</p>}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Facebook Connection */}
+        <motion.div variants={itemVariants}>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-primary/10">
+                  <Plug className="h-5 w-5 text-primary" />
+                </div>
+                <CardTitle className="text-lg">اتصال فيسبوك</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {statusLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-48 rounded-lg" />
+                  <Skeleton className="h-4 w-32 rounded-lg" />
+                </div>
+              ) : statusError ? (
+                <ErrorState onRetry={() => refetchStatus()} />
+              ) : (
+                <>
+                  <div className="text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">معرف الصفحة:</span>{" "}
+                    <code className="px-2 py-0.5 bg-muted rounded text-xs font-mono">{status?.page_id ?? "—"}</code>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-medium text-foreground">الحالة:</span>
+                    <Badge variant={status?.fb_connected !== false ? "default" : "destructive"} className="text-xs rounded-full">
+                      <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${status?.fb_connected !== false ? "bg-white" : "bg-white/60"}`} />
+                      {status?.fb_connected !== false ? "متصل" : "غير متصل"}
+                    </Badge>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      {/* Bot Logs */}
+      <motion.div variants={itemVariants}>
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <Server className="h-5 w-5" />
-              <CardTitle className="text-lg">حالة البوت</CardTitle>
+              <div className="p-1.5 rounded-lg bg-primary/10">
+                <Terminal className="h-5 w-5 text-primary" />
+              </div>
+              <CardTitle className="text-lg">سجل البوت</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {statusLoading ? (
-              <Skeleton className="h-10 w-full" />
+          <CardContent>
+            {logsLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <Skeleton className="h-6 w-16 shrink-0 rounded-full" />
+                    <Skeleton className="h-5 w-16 shrink-0 rounded" />
+                    <Skeleton className="h-5 w-full rounded" />
+                  </div>
+                ))}
+              </div>
+            ) : logsError ? (
+              <ErrorState onRetry={() => refetchLogs()} />
+            ) : logs.length === 0 ? (
+              <EmptyState message="لا توجد سجلات بعد" />
             ) : (
-              <>
-                <div className="flex items-center gap-3">
-                  <Badge variant={status?.running ? "default" : "destructive"} className="text-sm px-3 py-1">
-                    {status?.running ? "🟢 شغال" : "🔴 متوقف"}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">
-                    دورة الفحص: كل {status?.interval ?? 10} ثواني
-                  </span>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={() => restartMut.mutate()}
-                  disabled={restartMut.isPending}
-                >
-                  <RefreshCw className={`ml-2 h-4 w-4 ${restartMut.isPending ? "animate-spin" : ""}`} />
-                  {restartMut.isPending ? "جاري..." : "إعادة تشغيل البوت"}
-                </Button>
-              </>
+              <div className="space-y-1 max-h-80 overflow-y-auto" dir="ltr">
+                {logs.map((log, i) => (
+                  <div
+                    key={log.id ?? i}
+                    className="flex items-start gap-2 text-sm py-2 px-3 rounded-xl hover:bg-muted/50 transition-colors"
+                  >
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold shrink-0 ${
+                        levelBadgeClass[log.level] ?? "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {log.level}
+                    </span>
+                    <span className="text-muted-foreground text-xs shrink-0 font-mono" dir="ltr">
+                      {log.created_at ? format(new Date(log.created_at), "HH:mm:ss") : "—"}
+                    </span>
+                    <span className="break-words">{log.message}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              <CardTitle className="text-lg">اتصال فيسبوك</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-3">
-            <p>معرف الصفحة: <code className="px-2 py-0.5 bg-muted rounded text-xs">1235690416285843</code></p>
-            <p>تم ربط الصفحة بنجاح ✅</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Terminal className="h-5 w-5" />
-            <CardTitle className="text-lg">سجل البوت</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {logsLoading ? (
-            <div className="space-y-2">
-              {[1,2,3,4,5].map((i) => <Skeleton key={i} className="h-6 w-full" />)}
-            </div>
-          ) : logs.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">لا توجد سجلات بعد</p>
-          ) : (
-            <div className="space-y-1 max-h-80 overflow-y-auto">
-              {logs.map((log, i) => (
-                <div key={i} className="flex items-start gap-2 text-sm py-1.5 border-b border-border/50 last:border-0">
-                  <Badge variant={(levelColors[log.level] || "default")} className="text-[10px] px-1.5 py-0 shrink-0">
-                    {log.level}
-                  </Badge>
-                  <span className="text-muted-foreground text-xs shrink-0">
-                    {log.created_at ? format(new Date(log.created_at), "HH:mm:ss") : "-"}
-                  </span>
-                  <span>{log.message}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }

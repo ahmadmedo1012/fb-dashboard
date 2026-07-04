@@ -46,8 +46,10 @@ export function toggleRule(id) {
   return api(`/api/rules/${id}/toggle`, { method: "POST" });
 }
 
-export function fetchReplies(page = 1, perPage = 20) {
-  return api(`/api/replies?page=${page}&per_page=${perPage}`);
+export function fetchReplies(page = 1, perPage = 20, search = "") {
+  const params = new URLSearchParams({ page, per_page: perPage });
+  if (search) params.set("search", search);
+  return api(`/api/replies?${params}`);
 }
 
 export function fetchPosts() {
@@ -70,4 +72,44 @@ export function restartBot() {
 
 export function fetchLogs(limit = 50) {
   return api(`/api/logs?limit=${limit}`);
+}
+
+// ---- Auth ----
+export function login(username, password) {
+  const fd = new FormData();
+  fd.append("username", username);
+  fd.append("password", password);
+  return api("/api/login", { method: "POST", body: fd });
+}
+
+export function logout() {
+  return api("/api/logout", { method: "POST" });
+}
+
+export function fetchMe() {
+  return api("/api/me");
+}
+
+// ---- Users ----
+export function fetchUsers() {
+  return api("/api/users");
+}
+
+export function createUser(username, password, role) {
+  const fd = new FormData();
+  fd.append("username", username);
+  fd.append("password", password);
+  fd.append("role", role);
+  return api("/api/users", { method: "POST", body: fd });
+}
+
+export function updateUser(id, role, password = "") {
+  const fd = new FormData();
+  fd.append("role", role);
+  if (password) fd.append("password", password);
+  return api(`/api/users/${id}`, { method: "PUT", body: fd });
+}
+
+export function deleteUser(id) {
+  return api(`/api/users/${id}`, { method: "DELETE" });
 }

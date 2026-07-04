@@ -37,8 +37,6 @@ async def load_replied_ids(session) -> set:
 
 
 async def import_json_data(session, rules_file: str, state_file: str):
-    """Import existing json data into DB if DB is empty."""
-    # import rules
     count = await session.scalar(select(text("count(*) from rules")))
     if count == 0:
         import json
@@ -54,15 +52,12 @@ async def import_json_data(session, rules_file: str, state_file: str):
         await session.commit()
         log.info(f"Imported {len(data['rules'])} rules from JSON")
 
-    # import replied comments as replies
     import os
     if os.path.exists(state_file):
-        # just track them in BotState
         pass
 
 
 async def run_auto_reply(fb: FBClient):
-    """Single iteration of the auto-reply bot."""
     async with AsyncSessionLocal() as session:
         try:
             rules_data = await _load_rules(session)
@@ -81,6 +76,22 @@ async def run_auto_reply(fb: FBClient):
                     if not msg or cid in replied_ids:
                         continue
 
+                    # SKIP comments from the page itself (bot's own replies)
+                    from_id = str(c.get("from", {}).get("id", ""))
+                    if from_id == str(fb.page_id):
+                        continue
+
+                    # SKIP recent comments (<3s old)
+                    created = c.get("created_time", "")
+                    if created:
+                        try:
+                            from datetime import datetime, timezone
+                            t = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                            if (datetime.now(timezone.utc) - t).total_seconds() < 3:
+                                continue
+                        except Exception:
+                            pass
+
                     reply_text = match_rule(msg, rules_data)
                     if not reply_text:
                         continue
@@ -88,26 +99,30 @@ async def run_auto_reply(fb: FBClient):
                     name = fb.get_first_name(c)
                     final_reply = reply_text.replace("{name}", name)
 
+                    # POST reply to Facebook FIRST
                     result = await fb.reply_to_comment(cid, final_reply)
-                    if result:
-                        # double-check: another instance may have replied already
-                        existing = await session.get(Reply, cid)
-                        if existing:
-                            continue
-                        replied_ids.add(cid)
-                        try:
-                            session.add(Reply(
-                                fb_comment_id=cid,
-                                fb_post_id=pid,
-                                commenter_name=name,
-                                comment_text=msg,
-                                reply_text=final_reply,
-                            ))
-                            await session.commit()
-                            log.info(f"✓ Replied to {name}: \"{msg[:40]}\" → \"{final_reply[:40]}\"")
-                        except IntegrityError:
-                            await session.rollback()
-                            log.info(f"↺ Duplicate prevented for comment {cid}")
+                    if not result:
+                        log.error(f"API rejected reply to {cid}")
+                        continue
+
+                    # THEN save to DB
+                    replied_ids.add(cid)
+                    session.add(Reply(
+                        fb_comment_id=cid,
+                        fb_post_id=pid,
+                        commenter_name=name,
+                        comment_text=msg,
+                        reply_text=final_reply,
+                    ))
+                    try:
+                        await session.commit()
+                        log.info(f"Replied to {name}: {msg[:40]}")
+                    except IntegrityError:
+                        await session.rollback()
+                        log.info(f"Duplicate prevented for comment {cid}")
+
+                    await asyncio.sleep(0.5)
+
         except Exception as e:
             log.error(f"Bot error: {e}", exc_info=True)
             await add_log(session, "ERROR", str(e))
@@ -128,11 +143,9 @@ async def _load_rules(session) -> list[dict]:
 
 
 async def bot_worker():
-    """Main bot loop — runs forever."""
-    log.info("🤖 Bot worker started")
+    log.info("FB Auto-Reply Bot started")
     fb = FBClient(settings.FACEBOOK_ACCESS_TOKEN, settings.FACEBOOK_PAGE_ID)
 
-    # Import existing data on first run
     async with AsyncSessionLocal() as session:
         await import_json_data(
             session,
@@ -147,6 +160,5 @@ async def bot_worker():
 
 if __name__ == "__main__":
     from pathlib import Path
-    base_dir = Path(__file__).resolve().parent.parent
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     asyncio.run(bot_worker())
