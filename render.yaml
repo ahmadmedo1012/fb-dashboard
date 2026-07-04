@@ -4,9 +4,19 @@ services:
     runtime: python
     region: frankfurt
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |-
+      pip install -r requirements.txt
+      cd frontend && npm ci && npm run build && cp -r dist/* ../static/
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /api/stats
+    healthCheckPath: /api/me
     envVars:
       - key: SECRET_KEY
         generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: FACEBOOK_ACCESS_TOKEN
+        sync: false
+      - key: FACEBOOK_PAGE_ID
+        sync: false
+      - key: START_BOT
+        value: "true"
