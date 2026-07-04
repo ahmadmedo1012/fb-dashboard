@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { motion } from "framer-motion"
 import { fetchBotStatus, restartBot, fetchLogs } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,16 +7,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { RefreshCw, Terminal, Inbox, AlertTriangle, Plug, Clock, Bot } from "lucide-react"
 import { format } from "date-fns"
-
-const containerVariants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.07 } },
-}
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 24 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
-}
 
 const levelBadgeClass = {
   INFO: "border-transparent bg-primary/15 text-primary",
@@ -29,7 +18,7 @@ function EmptyState({ message, icon: Icon }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
       {Icon ? <Icon className="h-12 w-12 text-muted-foreground/40" /> : <Inbox className="h-12 w-12 text-muted-foreground/40" />}
-      <p className="text-muted-foreground">{message || "No logs yet"}</p>
+      <p className="text-muted-foreground">{message || "لا توجد سجلات بعد"}</p>
     </div>
   )
 }
@@ -40,10 +29,10 @@ function ErrorState({ error, onRetry }) {
       <div className="p-3 rounded-full bg-destructive/10">
         <AlertTriangle className="h-6 w-6 text-destructive" />
       </div>
-      <p className="text-sm text-muted-foreground">{error?.message || "Failed to load"}</p>
+      <p className="text-sm text-muted-foreground">{error?.message || "فشل التحميل"}</p>
       <Button variant="outline" size="sm" onClick={onRetry}>
         <RefreshCw className="mr-1 h-3 w-3" />
-        Retry
+        إعادة المحاولة
       </Button>
     </div>
   )
