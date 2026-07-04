@@ -1,0 +1,19 @@
+@import "tailwindcss";
+@import "./theme.css";
+
+@custom-variant dark (&:is(.dark *));
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Tajawal', system-ui, sans-serif;
+  margin: 0;
+}
+
+#root {
+  min-height: 100vh;
+}

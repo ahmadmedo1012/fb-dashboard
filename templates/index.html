@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة تحكم فيسبوك</title>
+<script src="https://unpkg.com/htmx.org@2.0.3"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body { font-family: 'Tajawal', sans-serif; }
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
+.stat-card { transition: all 0.2s; }
+.stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
+.sidebar-link.active { background: #eef2ff; color: #4f46e5; }
+.modal { display: none; }
+.modal:target, .modal.open { display: flex; }
+</style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+<div class="flex h-screen">
+  <!-- Sidebar -->
+  <aside class="w-64 bg-white shadow-lg p-4 flex flex-col border-l">
+    <div class="text-2xl font-bold text-indigo-600 mb-8 text-center">📊 FB Dashboard</div>
+    <nav class="space-y-2 flex-1">
+      <a href="#stats" class="sidebar-link active flex items-center gap-3 p-3 rounded-lg text-gray-600 hover:bg-indigo-50 hover:text-indigo-600" onclick="showSection('stats')">
+        <span>📈</span> الإحصائيات
+      </a>
+      <a href="#rules" class="sidebar-link flex items-center gap-3 p-3 rounded-lg text-gray-600 hover:bg-indigo-50 hover:text-indigo-600" onclick="showSection('rules')">
+        <span>⚙️</span> القواعد
+      </a>
+      <a href="#replies" class="sidebar-link flex items-center gap-3 p-3 rounded-lg text-gray-600 hover:bg-indigo-50 hover:text-indigo-600" onclick="showSection('replies')">
+        <span>💬</span> سجل الردود
+      </a>
+      <a href="#posts" class="sidebar-link flex items-center gap-3 p-3 rounded-lg text-gray-600 hover:bg-indigo-50 hover:text-indigo-600" onclick="showSection('posts')">
+        <span>📝</span> المنشورات
+      </a>
+      <a href="#settings" class="sidebar-link flex items-center gap-3 p-3 rounded-lg text-gray-600 hover:bg-indigo-50 hover:text-indigo-600" onclick="showSection('settings')">
+        <span>🔧</span> الإعدادات
+      </a>
+    </nav>
+    <div class="text-xs text-gray-400 text-center pt-4 border-t">
+      FB Auto Bot v1.0
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 overflow-y-auto p-8" id="main-content">
+
+    <!-- Stats Section -->
+    <section id="section-stats" class="section-active">
+      <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">📈 الإحصائيات</h1>
+        <button hx-get="/api/stats" hx-target="#stats-grid" hx-swap="outerHTML" class="px-4 py-2 bg-gray-100 rounded-lg text-sm hover:bg-gray-200">🔄 تحديث</button>
+      </div>
+      <div id="stats-grid" class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8" hx-get="/api/stats" hx-trigger="load" hx-swap="innerHTML">
+        <div class="stat-card bg-white rounded-xl shadow p-6 text-center animate-pulse">جاري التحميل...</div>
+      </div>
+      <div class="bg-white rounded-xl shadow p-6">
+        <h2 class="font-bold text-lg mb-4">📊 الردود آخر 7 أيام</h2>
+        <canvas id="chart-replies" height="200"></canvas>
+      </div>
+    </section>
+
+    <!-- Rules Section -->
+    <section id="section-rules" class="section-active hidden">
+      <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">⚙️ القواعد</h1>
+        <button onclick="openModal('add-rule-modal')" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">+ إضافة قاعدة</button>
+      </div>
+      <div id="rules-table" class="bg-white rounded-xl shadow overflow-hidden" hx-get="/api/rules" hx-trigger="load every 30s" hx-swap="innerHTML">
+        <table class="w-full text-right">
+          <thead class="bg-gray-50 border-b">
+            <tr><th class="p-4 font-bold">القاعدة</th><th class="p-4 font-bold">الكلمات المفتاحية</th><th class="p-4 font-bold">الرد</th><th class="p-4 font-bold">الحالة</th><th class="p-4 font-bold"></th></tr>
+          </thead>
+          <tbody id="rules-body" hx-get="/api/rules" hx-trigger="load" hx-swap="innerHTML">
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Replies Section -->
+    <section id="section-replies" class="section-active hidden">
+      <h1 class="text-3xl font-bold mb-6">💬 سجل الردود</h1>
+      <div class="bg-white rounded-xl shadow overflow-hidden">
+        <table class="w-full text-right">
+          <thead class="bg-gray-50 border-b">
+            <tr><th class="p-4">صاحب التعليق</th><th class="p-4">النص</th><th class="p-4">الرد</th><th class="p-4">التاريخ</th></tr>
+          </thead>
+          <tbody id="replies-body" hx-get="/api/replies?page=1&per_page=50" hx-trigger="load" hx-swap="innerHTML">
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Posts Section -->
+    <section id="section-posts" class="section-active hidden">
+      <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">📝 المنشورات</h1>
+        <button onclick="openModal('publish-modal')" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">+ نشر جديد</button>
+      </div>
+      <div id="posts-list" class="space-y-4" hx-get="/api/posts" hx-trigger="load" hx-swap="innerHTML">
+      </div>
+    </section>
+
+    <!-- Settings Section -->
+    <section id="section-settings" class="section-active hidden">
+      <h1 class="text-3xl font-bold mb-6">🔧 الإعدادات</h1>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white rounded-xl shadow p-6">
+          <h2 class="font-bold text-lg mb-4">حالة البوت</h2>
+          <div id="bot-status" hx-get="/api/bot/status" hx-trigger="load every 10s" hx-swap="innerHTML">
+            جاري التحميل...
+          </div>
+          <button hx-post="/api/bot/restart" hx-target="#bot-status" class="mt-4 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">🔄 إعادة تشغيل</button>
+        </div>
+        <div class="bg-white rounded-xl shadow p-6">
+          <h2 class="font-bold text-lg mb-4">سجل البوت</h2>
+          <div id="logs-list" class="text-sm max-h-60 overflow-y-auto space-y-1" hx-get="/api/logs?limit=30" hx-trigger="load every 30s" hx-swap="innerHTML">
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Add Rule Modal -->
+<div id="add-rule-modal" class="modal fixed inset-0 bg-black/50 items-center justify-center z-50" onclick="if(event.target===this)closeModal('add-rule-modal')">
+  <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-lg mx-4" onclick="event.stopPropagation()">
+    <h2 class="text-2xl font-bold mb-6">إضافة قاعدة جديدة</h2>
+    <form hx-post="/api/rules" hx-target="#rules-body" hx-swap="innerHTML" hx-on::after-request="closeModal('add-rule-modal')">
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">اسم القاعدة</label>
+        <input name="name" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="مثال: price_inquiry">
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">الكلمات المفتاحية (مفصولة بفاصلة)</label>
+        <input name="keywords" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="سعر, كم السعر, بكم">
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">نص الرد</label>
+        <textarea name="reply_template" required rows="3" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{name} مرحباً! للاستفسار عن السعر...">{name} </textarea>
+      </div>
+      <div class="mb-6">
+        <label class="block text-sm font-medium mb-1">وصف</label>
+        <input name="description" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="وصف القاعدة">
+      </div>
+      <div class="flex gap-3">
+        <button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">💾 حفظ</button>
+        <button type="button" onclick="closeModal('add-rule-modal')" class="px-6 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">إلغاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Publish Modal -->
+<div id="publish-modal" class="modal fixed inset-0 bg-black/50 items-center justify-center z-50" onclick="if(event.target===this)closeModal('publish-modal')">
+  <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-lg mx-4" onclick="event.stopPropagation()">
+    <h2 class="text-2xl font-bold mb-6">📝 نشر منشور جديد</h2>
+    <form hx-post="/api/publish" hx-target="#posts-list" hx-swap="innerHTML" hx-on::after-request="closeModal('publish-modal')">
+      <div class="mb-6">
+        <label class="block text-sm font-medium mb-1">نص المنشور</label>
+        <textarea name="message" required rows="5" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="اكتب المنشور هنا..."></textarea>
+      </div>
+      <div class="flex gap-3">
+        <button type="submit" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">📤 نشر</button>
+        <button type="button" onclick="closeModal('publish-modal')" class="px-6 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">إلغاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function showSection(id) {
+  document.querySelectorAll('.section-active').forEach(s => s.classList.add('hidden'));
+  const el = document.getElementById('section-' + id);
+  if (el) el.classList.remove('hidden');
+  document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// HTMX response handlers
+document.body.addEventListener('htmx:beforeSwap', function(evt) {
+  if (evt.target.id === 'stats-grid') {
+    evt.detail.shouldSwap = true;
+  }
+});
+
+// Stats formatter
+htmx.onLoad(function(content) {
+  if (content.id === 'stats-grid') {
+    const s = content;
+    if (s && s.children.length > 0 && !s.querySelector('.animate-pulse')) {
+      // Chart is drawn after stats load via a second call
+      fetch('/api/stats').then(r => r.json()).then(d => {
+        if (d.chart && Object.keys(d.chart).length > 0) {
+          const ctx = document.getElementById('chart-replies');
+          if (ctx) {
+            new Chart(ctx, {
+              type: 'line',
+              data: {
+                labels: Object.keys(d.chart),
+                datasets: [{
+                  label: 'الردود',
+                  data: Object.values(d.chart),
+                  borderColor: '#4f46e5',
+                  backgroundColor: 'rgba(79,70,229,0.1)',
+                  fill: true,
+                  tension: 0.3
+                }]
+              },
+              options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                  y: { beginAtZero: true, ticks: { stepSize: 1 } },
+                  x: { grid: { display: false } }
+                }
+              }
+            });
+          }
+        }
+      });
+    }
+  }
+});
+
+// Rules table renderer
+htmx.config.defaultSwapStyle = 'innerHTML';
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+  if (evt.target.id === 'rules-body' && typeof evt.detail.serverResponse === 'string') {
+    try {
+      const data = JSON.parse(evt.detail.serverResponse);
+      if (Array.isArray(data)) {
+        evt.target.innerHTML = data.map(r => `<tr class="border-b hover:bg-gray-50">
+          <td class="p-4 font-medium">${r.name}</td>
+          <td class="p-4 text-sm text-gray-600">${(r.keywords||[]).slice(0,5).join(', ')}${(r.keywords||[]).length>5 ? '...' : ''}</td>
+          <td class="p-4 text-sm text-gray-600 max-w-xs truncate">${(r.reply_template||'').substring(0,60)}</td>
+          <td class="p-4">
+            <button hx-post="/api/rules/${r.id}/toggle" hx-swap="none" hx-on:htmx:after-request="htmx.trigger('#rules-body', 'load')"
+              class="px-3 py-1 rounded-full text-xs font-medium ${r.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600'}">
+              ${r.enabled ? 'فعال' : 'معطل'}
+            </button>
+          </td>
+          <td class="p-4">
+            <button onclick="if(confirm('حذف القاعدة؟')) fetch('/api/rules/${r.id}',{method:'DELETE'}).then(()=>htmx.trigger('#rules-body','load'))"
+              class="text-red-500 hover:text-red-700 text-sm">🗑️</button>
+          </td>
+        </tr>`).join('');
+      }
+    } catch(e) { /* not JSON, htmx rendered HTML */ }
+  }
+  if (evt.target.id === 'replies-body' && typeof evt.detail.serverResponse === 'string') {
+    try {
+      const data = JSON.parse(evt.detail.serverResponse);
+      if (data.items) {
+        evt.target.innerHTML = data.items.map(r => `<tr class="border-b hover:bg-gray-50">
+          <td class="p-4 font-medium">${r.commenter_name}</td>
+          <td class="p-4 text-sm text-gray-600 max-w-xs truncate">${(r.comment_text||'').substring(0,80)}</td>
+          <td class="p-4 text-sm text-indigo-600 max-w-xs truncate">${(r.reply_text||'').substring(0,80)}</td>
+          <td class="p-4 text-xs text-gray-400">${new Date(r.created_at).toLocaleString('ar-SA')}</td>
+        </tr>`).join('');
+      }
+    } catch(e) {}
+  }
+  if (evt.target.id === 'posts-list' && typeof evt.detail.serverResponse === 'string') {
+    try {
+      const data = JSON.parse(evt.detail.serverResponse);
+      if (Array.isArray(data)) {
+        evt.target.innerHTML = data.map(p => `<div class="bg-white rounded-xl shadow p-6">
+          <div class="flex justify-between">
+            <div class="flex-1">
+              <p class="text-gray-800">${p.message || '(بدون نص)'}</p>
+              <p class="text-xs text-gray-400 mt-2">${p.created_time || ''}</p>
+            </div>
+            <span class="text-xs text-gray-400">${p.id.split('_').pop()}</span>
+          </div>
+        </div>`).join('');
+      }
+    } catch(e) {}
+  }
+  if (evt.target.id === 'bot-status' && typeof evt.detail.serverResponse === 'string') {
+    try {
+      const d = JSON.parse(evt.detail.serverResponse);
+      const status = d.running ? '🟢 شغال' : '🔴 متوقف';
+      evt.target.innerHTML = `<p>الحالة: <strong>${status}</strong></p><p>الدورة: كل ${d.interval} ثانية</p>`;
+    } catch(e) {}
+  }
+  if (evt.target.id === 'logs-list' && typeof evt.detail.serverResponse === 'string') {
+    try {
+      const data = JSON.parse(evt.detail.serverResponse);
+      if (Array.isArray(data)) {
+        evt.target.innerHTML = data.map(l => `<div class="text-xs ${l.level==='ERROR'?'text-red-500':'text-gray-600'}">[${new Date(l.created_at).toLocaleString('ar-SA')}] ${l.message}</div>`).join('');
+      }
+    } catch(e) {}
+  }
+});
+</script>
+
+</body>
+</html>
