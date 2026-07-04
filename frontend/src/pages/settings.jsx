@@ -56,7 +56,7 @@ export function Settings({ role }) {
     mutationFn: restartBot,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bot-status"] })
-      toast.success("Bot restarted successfully")
+      toast.success("تم إعادة تشغيل البوت بنجاح")
     },
     onError: (e) => toast.error(e.message),
   })
@@ -139,13 +139,13 @@ export function Settings({ role }) {
                 <>
                   <div className="text-sm text-muted-foreground">
                     <span className="font-medium text-foreground">معرف الصفحة:</span>{" "}
-                    <code className="px-2 py-0.5 bg-muted rounded text-xs font-mono">{status?.page_id ?? "—"}</code>
+                    <code className="px-2 py-0.5 bg-muted rounded text-xs font-mono">مُعد في الإعدادات</code>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <span className="font-medium text-foreground">الحالة:</span>
-                    <Badge variant={status?.fb_connected !== false ? "default" : "destructive"} className="text-xs rounded-full">
-                      <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${status?.fb_connected !== false ? "bg-white" : "bg-white/60"}`} />
-                      {status?.fb_connected !== false ? "متصل" : "غير متصل"}
+                    <Badge variant="default" className="text-xs rounded-full">
+                      <div className="w-1.5 h-1.5 rounded-full mr-1.5 bg-white" />
+                      حسب حالة البوت
                     </Badge>
                   </div>
                 </>

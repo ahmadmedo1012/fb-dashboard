@@ -93,7 +93,7 @@ export function Dashboard() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Activity className="size-5 text-muted-foreground" />
-                    Replies (آخر 7 أيام)
+                    الردود (آخر 7 أيام)
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -102,7 +102,7 @@ export function Dashboard() {
                       <LineChart data={chartData}>
                         <XAxis dataKey="date" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                         <YAxis allowDecimals={false} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                        <Tooltip
+                        <Tooltip isAnimationActive={false} wrapperStyle={{ direction: 'rtl' }}
                           contentStyle={{
                             borderRadius: "8px",
                             border: "1px solid hsl(var(--border))",
@@ -138,7 +138,7 @@ export function Dashboard() {
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      Automatically replies to comments matching configured rules.
+                      الرد التلقائي على التعليقات المطابقة للقواعد المحددة.
                     </p>
                   </div>
                 </CardContent>
